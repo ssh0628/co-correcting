@@ -12,19 +12,20 @@ from dataset.utils import noisify
 
 class ISIC(torch.utils.data.Dataset):
     '''
-    Notices:
-    train/val/test : first 60%/10%/30%
-    hxw:767 x 1022
+    ISIC 피부 병변 데이터셋 로더
+    - train/val/test 분할: 초기 60% / 10% / 30%
+    - 이미지 해상도: 원본 약 767 x 1022 (리사이즈하여 사용)
+    - 라벨: benign(양성) vs malignant(악성) 이진 분류
     '''
 
     def __init__(self,
                  root,
-                 train=0,
+                 train=0, # 0: train, 1: test, 2: val
                  transform=None,
                  target_transform=None,
-                 noise_type='clean',
-                 noise_rate=0.00,
-                 device=1,
+                 noise_type='clean', # 라벨 노이즈 타입
+                 noise_rate=0.00, # 라벨 노이즈 비율
+                 device=1, # 1: RAM에 이미지 로드
                  redux=None,
                  image_size=None
                  ):

@@ -8,6 +8,11 @@ from dataset.utils import noisify
 
 
 class PatchCamelyon(torch.utils.data.Dataset):
+    """
+    PatchCamelyon (PCam) 데이터셋 로더
+    - 병리학 슬라이드 이미지 데이터셋 (암 전이 여부 분류)
+    - h5 포맷으로 저장된 데이터를 로드함
+    """
 
     def __init__(self,
                  root,

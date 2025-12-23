@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class MLPNet(nn.Module):
+    # 간단한 다층 퍼셉트론(MLP) 모델 (MNIST용)
     def __init__(self):
         super(MLPNet, self).__init__()
         self.fc1 = nn.Linear(28*28, 256)
@@ -16,6 +17,7 @@ class MLPNet(nn.Module):
         return x
         
 class CNN_small(nn.Module):
+    # 소형 CNN 모델 (MNIST용)
     def __init__(self, num_classes=10):
         super(CNN_small, self).__init__()
         self.conv1 = nn.Conv2d(3, 6, 5)
@@ -38,6 +40,8 @@ def call_bn(bn, x):
     return bn(x)
 
 class CNN(nn.Module):
+    # 일반적인 CNN 모델 (9-layer)
+    # CIFAR-10 등에서 사용
     def __init__(self, input_channel=3, n_outputs=10, dropout_rate=0.25, momentum=0.1, linear_num=256):
         self.dropout_rate = dropout_rate
         self.momentum = momentum 

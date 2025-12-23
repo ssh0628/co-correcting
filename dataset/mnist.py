@@ -11,20 +11,14 @@ from dataset.utils import noisify
 
 
 class MNIST(data.Dataset):
-    """`MNIST <http://yann.lecun.com/exdb/mnist/>`_ Dataset.
-
+    """
+    MNIST 손글씨 숫자 데이터셋 로더
+    
     Args:
-        root (string): Root directory of dataset where ``processed/training.pt``
-            and  ``processed/test.pt`` exist.
-        train (bool, optional): If True, creates dataset from ``training.pt``,
-            otherwise from ``test.pt``.
-        download (bool, optional): If true, downloads the dataset from the internet and
-            puts it in root directory. If dataset is already downloaded, it is not
-            downloaded again.
-        transform (callable, optional): A function/transform that  takes in an PIL image
-            and returns a transformed version. E.g, ``transforms.RandomCrop``
-        target_transform (callable, optional): A function/transform that takes in the
-            target and transforms it.
+        root (string): 데이터셋 루트 디렉토리
+        train (bool, optional): True면 training.pt 사용, 아니면 test.pt 사용
+        download (bool, optional): 인터넷에서 데이터셋 다운로드 여부
+        transform (callable, optional): 이미지 전처리 함수
     """
     urls = [
         'http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz',

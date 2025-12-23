@@ -124,19 +124,18 @@ class _Transition(nn.Sequential):
 
 
 class DenseNet(nn.Module):
-    r"""Densenet-BC model class, based on
-    `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
-
+    """
+    DenseNet (Densely Connected Convolutional Networks) 모델 클래스
+    - 모든 레이어가 서로 바로 연결되는 구조를 가짐 (Feature Reuse 극대화)
+    
     Args:
-        growth_rate (int) - how many filters to add each layer (`k` in paper)
-        block_config (list of 4 ints) - how many layers in each pooling block
-        num_init_features (int) - the number of filters to learn in the first convolution layer
-        bn_size (int) - multiplicative factor for number of bottle neck layers
-          (i.e. bn_size * k features in the bottleneck layer)
-        drop_rate (float) - dropout rate after each dense layer
-        num_classes (int) - number of classification classes
-        memory_efficient (bool) - If True, uses checkpointing. Much more memory efficient,
-          but slower. Default: *False*. See `"paper" <https://arxiv.org/pdf/1707.06990.pdf>`_
+        growth_rate (int): 각 레이어마다 추가되는 필터 수 (k)
+        block_config (list): 각 블록의 레이어 개수 설정
+        num_init_features (int): 첫 컨볼루션 레이어의 필터 수
+        bn_size (int): 병목(bottleneck) 레이어의 배수 (bn_size * k)
+        drop_rate (float): 드롭아웃 비율
+        num_classes (int): 분류 클래스 개수
+        memory_efficient (bool): True일 경우 체크포인팅을 사용하여 메모리 절약 (속도는 느려짐)
     """
 
     __constants__ = ['features']

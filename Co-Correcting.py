@@ -4,6 +4,7 @@ import json
 import time
 import shutil
 import numpy as np
+
 from os.path import join
 
 import torch
@@ -21,21 +22,26 @@ from BasicTrainer import BasicTrainer
 
 class CoCorrecting(BasicTrainer, Loss):
     """
-    train co-pencil method
+    Train Co-Pencil Method
+    
+    Co-Correcting (또는 Co-Pencil) 학습 클래스
+    - BasicTrainer: 학습 환경 설정, 로깅, 모델 저장 등의 기본 기능 상속
+    - Loss: Co-teaching 및 PENCIL 손실 함수 계산 로직 상속
     """
 
     def __init__(self, args):
         super().__init__(args)
         """
-            model A, B : Dual architecture
-            model C : best model
-            prepare optim, loss func
+            model A, B : Dual architecture (상호 학습을 위한 두 개의 모델)
+            model C : best model (최고 성능 모델 저장용)
+            prepare optim, loss func (최적화 도구 및 손실 함수 준비)
         """
-        # Initialize Cooperation Models
+        # 상호 학습을 위한 모델 초기화 (동일한 구조의 모델 A, B 생성)
         self.modelA = self._get_model(self.args.backbone)
         self.modelB = self._get_model(self.args.backbone)
         self.modelC = self._get_model(self.args.backbone)
-        # Optimizer & Criterion
+        # Optimizer & Criterion (최적화 함수 및 기준)
+
         self.criterion = torch.nn.CrossEntropyLoss().to(self.args.device)
         self.logsoftmax = nn.LogSoftmax(dim=1).to(self.args.device)
         self.softmax = nn.Softmax(dim=1).to(self.args.device)
@@ -104,6 +110,11 @@ class CoCorrecting(BasicTrainer, Loss):
 
     # define drop rate schedule
     def gen_forget_rate(self, forget_rate, fr_type='type_1'):
+        """
+        망각 비율(Forget Rate) 스케줄 생성 함수
+        - type_1: 점진적으로 증가하다가 일정 값 유지 (Linear)
+        - type_2: 점진적으로 증가 후 다시 증가 (Step)
+        """
         if fr_type == 'type_1':
             rate_schedule = np.ones(args.n_epoch) * forget_rate
             rate_schedule[:args.num_gradual] = np.linspace(0, forget_rate, args.num_gradual)
@@ -117,6 +128,11 @@ class CoCorrecting(BasicTrainer, Loss):
         return rate_schedule
 
     def _rate_schedule(self, epoch):
+        """
+        에폭별 망각 비율(R(T)) 계산 함수
+        - Warm-up, Num-gradual, Exponent 등의 파라미터를 고려하여
+        - 현재 에폭에서의 Drop Rate를 반환합니다.
+        """
         rate_schedule = np.ones(self.args.epochs) * self.args.forget_rate
         if self.args.warmup > 0:
             rate_schedule[:self.args.warmup] = 0
@@ -136,6 +152,8 @@ class CoCorrecting(BasicTrainer, Loss):
 
     def _adjust_learning_rate(self, epoch):
         """Sets the learning rate"""
+        # 학습률(Learning Rate) 스케줄링 함수
+        # Stage 2 이후부터 학습률을 점진적으로 감소시킴
         if epoch < self.args.stage2:
             lr = self.args.lr
         elif epoch < (self.args.epochs - self.args.stage2) // 3 + self.args.stage2:
@@ -150,14 +168,17 @@ class CoCorrecting(BasicTrainer, Loss):
             param_group['lr'] = lr
 
     def _compute_loss(self, outputA, outputB, target, target_var, index, epoch, i, parallel=False):
-        # Warm Up
+        # 손실 계산 함수 (핵심 로직)
+        
+        # 1. Warm Up 단계 (Stage 1 이전)
+        # - 초기에는 Cross Entropy Loss로 일반적인 학습 진행
         if epoch < self.args.stage1:
-            # init y_tilde, let softmax(y_tilde) is noisy labels
+            # y_tilde 초기화: 초반에는 주어진 라벨(target)을 그대로 사용
             onehot = torch.zeros(target.size(0),
                                  self.args.classnum).scatter_(1, target.view(-1, 1), self.args.K)
             onehot = onehot.numpy()
             self.new_y[index, :] = onehot
-            # training as normal co-teaching
+            # Co-teaching 학습 진행
             forget_rate = self._rate_schedule(epoch)
             if self.args.loss_type == 'coteaching':
                 lossA, lossB, ind_A_update, ind_B_update, ind_A_discard, ind_B_discard, pure_ratio_1, pure_ratio_2, \
@@ -172,17 +193,18 @@ class CoCorrecting(BasicTrainer, Loss):
             return lossA, lossB, onehot, onehot, ind_A_discard, ind_B_discard, \
                    pure_ratio_1, pure_ratio_2, pure_ratio_discard_1, pure_ratio_discard_2
         
-        # Label Correction
+        # 2. Label Correction 단계 (Stage 1 ~ Stage 2)
+        # - PENCIL 손실 함수 사용: 라벨 분포(y_tilde)를 학습 통해 업데이트
         elif epoch < self.args.stage2:
-            # using select data sample update parameters, other update label only
+            # selection 된 데이터만 파라미터 업데이트, 나머지는 라벨만 업데이트
             yy_A = self.yy
             yy_B = self.yy
             yy_A = torch.tensor(yy_A[index, :], dtype=torch.float32, requires_grad=True, device=self.args.device)
             yy_B = torch.tensor(yy_B[index, :], dtype=torch.float32, requires_grad=True, device=self.args.device)
-            # obtain label distributions (y_hat)
+            # 라벨 분포(y_hat) 획득
             last_y_var_A = self.softmax(yy_A)
             last_y_var_B = self.softmax(yy_B)
-            # sort samples
+            # 샘플 정렬 및 선택 (Small Loss Trick)
             forget_rate = self._rate_schedule(epoch)
             if self.args.loss_type == 'coteaching':
                 lossA, lossB, ind_A_update, ind_B_update, ind_A_discard, ind_B_discard, \
@@ -199,7 +221,8 @@ class CoCorrecting(BasicTrainer, Loss):
             return lossA, lossB, yy_A, yy_B, ind_A_discard, ind_B_discard, \
                    pure_ratio_1, pure_ratio_2, pure_ratio_discard_1, pure_ratio_discard_2
         
-        # Fine tuning
+        # 3. Fine Tuning 단계 (Stage 2 이후)
+        # - 수정된 라벨을 바탕으로 최종 미세 조정
         else:
             yy_A = self.yy
             yy_A = torch.tensor(yy_A[index, :], dtype=torch.float32, requires_grad=True, device=self.args.device)
@@ -228,11 +251,19 @@ class CoCorrecting(BasicTrainer, Loss):
                                                                                        softmax=False)
             else:
                 raise NotImplementedError("loss_type {} not been found".format(self.args.loss_type))
-
+ 
             return lossA, lossB, yy_A, yy_B, ind_A_discard, ind_B_discard, \
                    pure_ratio_1, pure_ratio_2, pure_ratio_discard_1, pure_ratio_discard_2
 
     def _gen_clustering_data(self, mode='dual'):
+        """
+        커리큘럼 학습을 위한 클러스터링 데이터 생성 함수
+        - 모델의 중간 특징(Feature)을 추출하여 클러스터링에 활용할 데이터셋을 만듭니다.
+        
+        mode='dual':
+        - 두 모델(NetA, NetB)의 특징을 모두 추출하여 결합(Concatenate)합니다.
+        - register_forward_hook을 사용하여 Forward Pass 중 특징을 가로챕니다.
+        """
         if mode == 'dual':
             featureA = []
             def hookA(module, input, output):
@@ -399,6 +430,7 @@ class CoCorrecting(BasicTrainer, Loss):
         return update_stage
 
     def training(self):
+        # 전체 학습 루프 실행 함수
         timer = AverageMeter()
         # train
         end = time.time()
@@ -451,8 +483,9 @@ class CoCorrecting(BasicTrainer, Loss):
             print("Epoch {} using {} min {:.2f} sec".format(epoch, timer.val // 60, timer.val % 60))
 
 
-    # Train Roop
+    # Train Loop
     def train(self, epoch=0):
+        # 1 에폭(Epoch) 동안의 학습 수행
         batch_time = AverageMeter()
         losses_A = AverageMeter()
         losses_B = AverageMeter()

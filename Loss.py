@@ -7,7 +7,10 @@ from torch.nn import functional as F
 
 class Loss(object):
     """
-    co-pencil loss
+    Co-Pencil Loss Class
+    Co-Pencil 알고리즘에서 사용하는 다양한 손실 함수들을 정의한 클래스입니다.
+    - PENCIL Loss: Label Correction(라벨 수정)을 위한 손실 함수 (KL Div + Entropy + Compatibility)
+    - Co-teaching Loss: 두 모델이 서로 선택한 샘플로 학습하는 손실 함수
     """
 
     def __init__(self, args):
@@ -15,8 +18,11 @@ class Loss(object):
         self.logsoftmax = nn.LogSoftmax(dim=1).to(self.args.device)
         self.softmax = nn.Softmax(dim=1).to(self.args.device)
 
-    # pencil loss functions : label correction
+    # PENCIL Loss Functions: Label Correction (라벨 수정) 관련 함수들
+    
+    # KL Divergence 손실 (분류 손실)
     def _pencil_loss_kl(self, X, Y, reduction='mean'):
+        # X: 모델 예측값 (Logits), Y: 라벨 분포 (y_tilde)
         if reduction == 'mean':
             return torch.mean(self.softmax(X) * (self.logsoftmax(X) - torch.log((Y))))
         elif reduction == 'none':
@@ -26,6 +32,7 @@ class Loss(object):
         else:
             return torch.mean(self.softmax(X) * (self.logsoftmax(X) - torch.log((Y))))
 
+    # Entropy 손실 (불확실성 낮추기, 예측 확신 높이기)
     def _pencil_loss_entropy(self, X, reduction='mean'):
         if reduction == 'mean':
             return - torch.mean(torch.mul(self.softmax(X), self.logsoftmax(X)))
@@ -36,16 +43,18 @@ class Loss(object):
         else:
             return - torch.mean(torch.mul(self.softmax(X), self.logsoftmax(X)))
 
+    # Compatibility 손실 (현재 라벨 분포와 초기 라벨 또는 타겟과의 호환성)
     def _pencil_loss_compatibility(self, Y, T, reduction='mean'):
         return F.cross_entropy(Y, T, reduction=reduction)
 
     def _pencil_loss(self, X, last_y_var_A, alpha, beta, reduction='mean', target_var=None):
+        # 최종 PENCIL 손실 계산: KL Div + alpha * Compatibility + beta * Entropy
         assert not target_var == None
-        # lc is classification loss
+        # lc: Classification Loss (KL Divergence)
         lc = self._pencil_loss_kl(X, last_y_var_A, reduction=reduction)
-        # le is entropy loss
+        # le: Entropy Loss
         le = self._pencil_loss_entropy(X, reduction=reduction)
-        # lo is compatibility loss
+        # lo: Compatibility Loss
         lo = self._pencil_loss_compatibility(last_y_var_A, target_var, reduction=reduction)
         return lc + alpha * lo + beta * le
 
@@ -71,15 +80,18 @@ class Loss(object):
     def loss_coteaching(self, y_1, y_2, t_1, t_2, forget_rate, loss_type='CE', ind=[], noise_or_not=[],
                         target_var=None, parallel=False, softmax=False):
         """
-        CO-teaching实际上并不是用网络的梯度进行互相传递，实际上就是一种样本选择的方式
-        warm up
-        :param y_1:
-        :param y_2:
-        :param t:
-        :param forget_rate:
-        :param ind:
-        :param noise_or_not:
-        :return:
+        Co-teaching Loss 함수
+        두 네트워크(NetA, NetB)가 서로 Small Loss 샘플을 선택하여 교차 학습합니다.
+        
+        작동 원리:
+        1. 각 네트워크가 배치 내 샘플들의 손실(Loss)을 계산
+        2. 손실이 작은 순서대로 정렬 (Small Loss Trick)
+        3. 전체 데이터 중 (1 - forget_rate) 비율만큼의 '깨끗한(Clean)' 것으로 추정되는 샘플 선택
+        4. 서로 선택한 샘플에 대해서 상대방 네트워크를 업데이트 (Exchange)
+        
+        :param y_1, y_2: 모델 1, 2의 예측값
+        :param t_1, t_2: 타겟 라벨
+        :param forget_rate: 현재 에폭에서의 망각 비율 (노이즈로 간주하여 버릴 비율)
         """
         if softmax:
             y_1 = self.softmax(y_1)
@@ -124,6 +136,11 @@ class Loss(object):
 
     def loss_coteaching_plus(self, y_1, y_2, t_1, t_2, forget_rate, step, ind=[], loss_type='CE',
                              noise_or_not=[], target_var=None, parallel=False, softmax=True):
+        """
+        Co-teaching+ Loss 함수
+        Co-teaching의 개선판으로, 두 모델의 예측이 '불일치(Disagree)'하는 샘플 중에서
+        Small Loss 샘플을 선택하여 학습합니다.
+        """
         if softmax:
             outputs = F.softmax(y_1, dim=1)
             outputs2 = F.softmax(y_2, dim=1)

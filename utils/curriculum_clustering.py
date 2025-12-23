@@ -12,6 +12,11 @@ from sklearn.utils import check_array, check_consistent_length, gen_batches
 
 def cluster_curriculum_subsets(X, y, n_subsets=3, method='default', density_t=0.6, verbose=False,
                                dim_reduce=256, batch_max=10000, random_state=None, calc_auxiliary=False):
+    """
+    CurriculumNet 클러스터링 함수
+    - 데이터의 밀도(Density)를 기반으로 학습 난이도별 서브셋(Subset)을 생성합니다.
+    - 고밀도 영역(Clean) -> 저밀도 영역(Noisy/Hard) 순으로 클러스터링
+    """
 
     if not density_t > 0.0:
         raise ValueError("density_thresh must be positive.")
