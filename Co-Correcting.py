@@ -84,7 +84,7 @@ class CoCorrecting(BasicTrainer, Loss):
         os.makedirs(self.args.dir, exist_ok=True)
         os.makedirs(join(self.args.dir, 'record'), exist_ok=True)
 
-        keys = ['acc', 'acc5', 'label_accu', 'loss', "pure_ratio", "label_n2t", "label_t2n", "pure_ratio_discard"]
+        keys = ['acc', 'acc5', 'label_accu', 'loss', "pure_ratio", "label_n2t", "label_t2n", "pure_ratio_discard", "margin_accu"]
         record_infos = {}
         for k in keys:
             record_infos[k] = []

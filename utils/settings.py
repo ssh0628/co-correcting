@@ -32,9 +32,10 @@ def get_args():
 
     elif sys.platform == 'win32':
         # Windows 전용 기본 설정
-        isic_root = 'D:/Datasets/ISIC'  # 예시 경로
+        isic_root = 'D:/Datasets/ISIC' 
         petskin_root = 'D:/Datasets/PetSkin'
         mnist_root = './data/mnist'
+        pcam_root = "C:\\Users\\cream\\OneDrive\\Desktop\\co-correcting-data"
         batch_size = 16
         device = 'cuda:0' # GPU 사용 시
         data_device = 0
